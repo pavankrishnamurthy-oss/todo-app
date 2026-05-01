@@ -1,24 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [todos, setTodos] = useState([]);
   const [text, setText] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  function addTodo(e) {
+  useEffect(() => {
+    fetch('/api/todos')
+      .then((res) => res.json())
+      .then((data) => setTodos(data))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function addTodo(e) {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    setTodos([...todos, { id: Date.now(), text: trimmed, done: false }]);
+
+    const res = await fetch('/api/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: trimmed }),
+    });
+    const created = await res.json();
+    setTodos([created, ...todos]);
     setText('');
   }
 
-  function toggleTodo(id) {
-    setTodos(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  async function toggleTodo(id) {
+    const res = await fetch(`/api/todos/${id}`, { method: 'PATCH' });
+    const updated = await res.json();
+    setTodos(todos.map((t) => (t.id === id ? updated : t)));
   }
 
-  function deleteTodo(id) {
+  async function deleteTodo(id) {
+    await fetch(`/api/todos/${id}`, { method: 'DELETE' });
     setTodos(todos.filter((t) => t.id !== id));
   }
 
@@ -29,9 +47,11 @@ export default function Home() {
           My Todos
         </h1>
         <p className="mb-8 text-zinc-500 dark:text-zinc-400">
-          {todos.length === 0
-            ? 'Nothing yet — add your first todo below.'
-            : `${todos.filter((t) => !t.done).length} open · ${todos.length} total`}
+          {loading
+            ? 'Loading…'
+            : todos.length === 0
+              ? 'Nothing yet — add your first todo below.'
+              : `${todos.filter((t) => !t.completed).length} open · ${todos.length} total`}
         </p>
 
         <form onSubmit={addTodo} className="mb-6 flex gap-2">
@@ -51,49 +71,60 @@ export default function Home() {
           </button>
         </form>
 
-        <ul className="space-y-2">
-          {todos.map((todo) => (
-            <li
-              key={todo.id}
-              className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <input
-                type="checkbox"
-                checked={todo.done}
-                onChange={() => toggleTodo(todo.id)}
-                className="h-5 w-5 cursor-pointer accent-zinc-900 dark:accent-zinc-50"
+        {loading ? (
+          <ul className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <li
+                key={i}
+                className="h-12 animate-pulse rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
               />
-              <span
-                className={`flex-1 ${
-                  todo.done
-                    ? 'text-zinc-400 line-through dark:text-zinc-600'
-                    : 'text-zinc-900 dark:text-zinc-50'
-                }`}
+            ))}
+          </ul>
+        ) : (
+          <ul className="space-y-2">
+            {todos.map((todo) => (
+              <li
+                key={todo.id}
+                className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
               >
-                {todo.text}
-              </span>
-              <button
-                onClick={() => deleteTodo(todo.id)}
-                aria-label="Delete todo"
-                className="rounded-md p-1.5 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  onChange={() => toggleTodo(todo.id)}
+                  className="h-5 w-5 cursor-pointer accent-zinc-900 dark:accent-zinc-50"
+                />
+                <span
+                  className={`flex-1 ${
+                    todo.completed
+                      ? 'text-zinc-400 line-through dark:text-zinc-600'
+                      : 'text-zinc-900 dark:text-zinc-50'
+                  }`}
                 >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </li>
-          ))}
-        </ul>
+                  {todo.text}
+                </span>
+                <button
+                  onClick={() => deleteTodo(todo.id)}
+                  aria-label="Delete todo"
+                  className="rounded-md p-1.5 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-5 w-5"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </main>
   );
